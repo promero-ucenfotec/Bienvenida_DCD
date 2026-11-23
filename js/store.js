@@ -19,7 +19,7 @@ const clone = (v) => (v === undefined ? v : JSON.parse(JSON.stringify(v)));
 
 /* ------------------------------------------------------------------ demo */
 function demoStore() {
-  let db = { presentations: {}, items: {}, sessions: {}, players: {}, answers: {} };
+  let db = { projects: {}, presentations: {}, items: {}, sessions: {}, players: {}, answers: {} };
   const bc = new BroadcastChannel('pulso-demo');
   const subs = new Set();
   const emit = (top) => subs.forEach((s) => s.top === top && s.fn());
@@ -84,10 +84,17 @@ function demoStore() {
       return clone(Object.values(db.presentations).sort((a, b) => b.updated_at.localeCompare(a.updated_at))
         .map((p) => { const it = itemsOf(p.id); return { ...p, count: it.length, cover: it.find((i) => i.thumb)?.thumb || null }; }));
     },
+    async listProjects() { return clone(Object.values(db.projects).sort((a, b) => b.created_at.localeCompare(a.created_at))); },
+    async createProject(name) { const p = { id: uuid(), name, created_at: new Date().toISOString() }; mut(['projects', p.id], p); return clone(p); },
+    async renameProject(id, name) { if (db.projects[id]) mut(['projects', id], { ...db.projects[id], name }); },
+    async deleteProject(id) {
+      Object.values(db.presentations).filter((p) => p.project_id === id).forEach((p) => mut(['presentations', p.id], { ...p, project_id: null }));
+      mut(['projects', id], undefined);
+    },
     async getPresentation(id) { return clone(db.presentations[id]) || null; },
-    async createPresentation(title) {
+    async createPresentation(title, project_id = null) {
       const now = new Date().toISOString();
-      const p = { id: uuid(), title, created_at: now, updated_at: now };
+      const p = { id: uuid(), title, project_id, created_at: now, updated_at: now };
       mut(['presentations', p.id], p); return clone(p);
     },
     async updatePresentation(id, patch) {
@@ -176,12 +183,18 @@ function supaStore() {
       const its = ok(await sb.from('items').select('presentation_id,pos,thumb').in('presentation_id', ps.map((p) => p.id)).order('pos'));
       return ps.map((p) => { const mine = its.filter((i) => i.presentation_id === p.id); return { ...p, count: mine.length, cover: mine.find((i) => i.thumb)?.thumb || null }; });
     },
+    async listProjects() { return ok(await sb.from('projects').select('*').order('created_at', { ascending: false })); },
+    async createProject(name) { return ok(await sb.from('projects').insert({ name }).select().single()); },
+    async renameProject(id, name) { ok(await sb.from('projects').update({ name }).eq('id', id)); },
+    async deleteProject(id) { ok(await sb.from('projects').delete().eq('id', id)); },
     async getPresentation(id) { return ok(await sb.from('presentations').select('*').eq('id', id).maybeSingle()); },
-    async createPresentation(title) { return ok(await sb.from('presentations').insert({ title }).select().single()); },
+    async createPresentation(title, project_id = null) { return ok(await sb.from('presentations').insert({ title, project_id }).select().single()); },
     async updatePresentation(id, patch) { ok(await sb.from('presentations').update({ ...patch, updated_at: new Date().toISOString() }).eq('id', id)); },
     async deletePresentation(id) {
       try {
-        const files = ok(await sb.storage.from('slides').list(id, { limit: 1000 }));
+        // Una copia de esta presentación puede seguir usando sus imágenes: esas no se borran.
+        const used = ok(await sb.from('items').select('data').neq('presentation_id', id).like('data->>src', `%/${id}/%`)).map((i) => i.data.src);
+        const files = ok(await sb.storage.from('slides').list(id, { limit: 1000 })).filter((f) => !used.some((u) => u.endsWith(`/${id}/${f.name}`)));
         if (files.length) await sb.storage.from('slides').remove(files.map((f) => `${id}/${f.name}`));
       } catch { /* las imágenes huérfanas no impiden borrar */ }
       ok(await sb.from('presentations').delete().eq('id', id));

@@ -20,6 +20,12 @@ Presentaciones en vivo para grupos grandes: diapositivas con actividades interca
 | Sopa de letras | Encuentra las palabras escondidas en la cuadrícula |
 | Palabra secreta | Ordena las letras revueltas a partir de una pista |
 
+## Proyectos
+
+Las presentaciones se agrupan en proyectos, por ejemplo «Bienvenida enero 2027». Todo administrador ve los mismos proyectos y puede editar o presentar cualquiera de sus presentaciones. Tanto una presentación como un proyecto completo se duplican con un clic, lo que sirve para reutilizar un evento anterior.
+
+En el editor, cada diapositiva tiene el botón **Reemplazar diapositiva**: se elige una imagen o un PDF y la diapositiva conserva su lugar.
+
 ## Puntos, clasificación y registro
 
 Cada actividad vale hasta 1000 puntos: la mitad depende del acierto y la otra mitad de la rapidez dentro del tiempo asignado. Al mostrar los resultados, cada participante ve su lugar en la tabla.

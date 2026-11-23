@@ -1,12 +1,21 @@
 -- Pulso · esquema de base de datos para Supabase
 -- Pegá todo este archivo en Supabase → SQL Editor → Run. Se puede ejecutar más de una vez.
 
+create table if not exists projects (
+  id uuid primary key default gen_random_uuid(),
+  name text not null check (char_length(name) between 1 and 80),
+  created_at timestamptz not null default now()
+);
+
 create table if not exists presentations (
   id uuid primary key default gen_random_uuid(),
   title text not null default 'Presentación sin título',
   created_at timestamptz not null default now(),
   updated_at timestamptz not null default now()
 );
+
+alter table presentations add column if not exists project_id uuid references projects(id) on delete set null;
+create index if not exists presentations_project_idx on presentations(project_id);
 
 create table if not exists items (
   id uuid primary key,
@@ -98,6 +107,13 @@ grant all on presentations, items, sessions, players, answers to authenticated;
 grant select on presentations, items, sessions, answers to anon;
 grant insert, update on answers to anon;
 revoke all on players from anon;
+
+-- Los proyectos agrupan presentaciones y solo los ven los administradores.
+alter table projects enable row level security;
+drop policy if exists "admin" on projects;
+create policy "admin" on projects for all to authenticated using (true) with check (true);
+grant all on projects to authenticated;
+revoke all on projects from anon;
 
 drop policy if exists "responder" on answers;
 drop policy if exists "corregir" on answers;

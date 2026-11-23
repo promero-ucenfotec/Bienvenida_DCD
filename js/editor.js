@@ -125,7 +125,12 @@ export async function editor(root, pid) {
     const at = fields().indexOf(document.activeElement), caret = at >= 0 ? document.activeElement.selectionStart : null;
     if (at >= 0) queueMicrotask(() => { const f = fields()[at]; if (!f) return; f.focus(); try { if (caret != null) f.setSelectionRange(caret, caret); } catch { /* */ } });
     if (!it) return put(side, h('div.side-empty', h('h3', 'Empezá por el contenido'), h('p', 'Subí un PDF o agregá una actividad. Después podés ordenar todo arrastrando en la columna izquierda.')));
-    if (it.type === 'slide') return put(side, h('h3', 'Diapositiva'), h('p.muted', 'Las personas la ven en su dispositivo mientras está en pantalla. Arrastrala en la columna izquierda para cambiarla de lugar.'));
+    if (it.type === 'slide') {
+      const pick = h('input', { type: 'file', accept: '.pdf,application/pdf,image/*', hidden: true, onchange: (e) => { const f = e.target.files[0]; e.target.value = ''; if (f) replaceSlide(it, f); } });
+      return put(side, h('h3', 'Diapositiva'), h('p.muted', 'Las personas la ven en su dispositivo mientras está en pantalla. Arrastrala en la columna izquierda para cambiarla de lugar.'),
+        h('button.btn.soft', { type: 'button', onclick: () => pick.click() }, icon('swap', 18), 'Reemplazar diapositiva'), pick,
+        h('span.hint', 'Elegí una imagen o un PDF; de un PDF se toma la primera página. La diapositiva conserva su lugar.'));
+    }
     put(side, h('h3', TYPES[it.type].label), editorForm(it, (structural) => { touch(it); drawCanvas(); drawFilm(); if (structural) drawSide(); }));
   }
   const drawAll = () => { drawFilm(); drawCanvas(); drawSide(); };
@@ -146,6 +151,16 @@ export async function editor(root, pid) {
     const i = items.indexOf(it); items.splice(i, 1); clearTimeout(pending.get(it.id)); pending.delete(it.id);
     store.deleteItem(it.id).catch(() => toast('No se pudo eliminar.', 'err'));
     select(items[Math.min(i, items.length - 1)]?.id || null);
+  }
+  async function replaceSlide(it, file) {
+    const note = toast('Reemplazando diapositiva…'); note.classList.add('sticky');
+    try {
+      const { value } = await pagesOf(file).next();
+      const src = await store.uploadImage(pid, value.out.blob);
+      it.data = { ...it.data, src, w: value.out.w, h: value.out.h }; it.thumb = value.out.thumb;
+      await store.saveItem(it); drawFilm(); drawCanvas(); toast('Diapositiva reemplazada', 'ok');
+    } catch (e) { console.error(e); toast('No se pudo leer el archivo. Probá con una imagen o un PDF.', 'err'); }
+    note.remove();
   }
   async function importFiles(files) {
     const ppt = files.find((f) => /\.pptx?$/i.test(f.name));

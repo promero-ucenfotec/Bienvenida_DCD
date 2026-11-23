@@ -151,3 +151,17 @@ Object.assign(P, {
   frog: 'M4 13c0-2.5 1.2-4 2.5-4.6M20 13c0-2.5-1.2-4-2.5-4.6M4 13c0 4 3.5 6 8 6s8-2 8-6M6 9a2.5 2.5 0 1 1 5 0M13 9a2.5 2.5 0 1 1 5 0M9 14.5c2 1 4 1 6 0',
   live: 'M12 14a2 2 0 1 0 0-4 2 2 0 0 0 0 4M7.5 16.5a6.4 6.4 0 0 1 0-9M16.5 7.5a6.4 6.4 0 0 1 0 9M4.6 19.4a10.5 10.5 0 0 1 0-14.8M19.4 4.6a10.5 10.5 0 0 1 0 14.8',
 });
+Object.assign(P, { folder: 'M3 6h6l2 3h10v10H3z', edit: 'M4 20h4L19 9l-4-4L4 16zM13 7l4 4' });
+
+// Pide un texto corto en un cuadro de diálogo. Devuelve el texto o null si se cancela.
+export function askText(title, label, value = '', okLabel = 'Guardar') {
+  return new Promise((res) => {
+    const close = (v) => { dlg.close(); dlg.remove(); res(v); };
+    const input = h('input.inp', { value, maxLength: 80, required: true });
+    const dlg = h('dialog.dialog', { oncancel: () => close(null) },
+      h('form', { onsubmit: (e) => { e.preventDefault(); const v = input.value.trim(); if (v) close(v); } },
+        h('h3', title), h('label.field', { style: { marginBottom: '22px' } }, h('span.lbl', label), input),
+        h('div.row.end', h('button.btn.ghost', { type: 'button', onclick: () => close(null) }, 'Cancelar'), h('button.btn.primary', { type: 'submit' }, okLabel))));
+    document.body.append(dlg); dlg.showModal(); input.select();
+  });
+}
