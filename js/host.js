@@ -22,7 +22,7 @@ export async function host(root, code) {
   const count = h('b', '0');
   const shell = h('div.host',
     h('header.h-top',
-      h('a.brand.light', { href: '#/admin', title: 'Volver a mis presentaciones' }, h('span.brand-mark'), 'Pulso'),
+      h('a.brand.light', { href: '#/admin', title: 'Volver a mis presentaciones' }, h('span.brand-mark'), 'TeachDeck'),
       h('div.h-join', 'Entrá en ', h('b', (location.host + location.pathname).replace(/\/(index\.html)?$/, '')), ' con el código ', h('b.h-code', prettyCode(code))),
       h('div.h-people', icon('users', 18), count)),
     stageEl, strip, bar);

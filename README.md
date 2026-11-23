@@ -1,4 +1,4 @@
-# Pulso
+# TeachDeck
 
 Presentaciones en vivo para grupos grandes: diapositivas con actividades intercaladas que cada persona responde desde su dispositivo.
 
@@ -34,13 +34,15 @@ Quien participa puede repasar lo ya visto con las flechas inferiores y regresar 
 
 El botón **Excel** de la sala, o **Descargar resultados** en la biblioteca, genera un archivo con una fila por participante: lugar, nombre, correo institucional, puntos, nota de 0 a 100, actividades respondidas y porcentaje de avance en la presentación. Una segunda hoja detalla los puntos por actividad.
 
-Los datos de participación de cada sala (nombres, correos, respuestas y puntos) se borran solos a los 3 días de abierta; las presentaciones y los proyectos se conservan. El plazo se cambia en `KEEP_DAYS` de `js/store.js` y en la tarea programada de `supabase/schema.sql`.
+Los datos de participación de cada sala (nombres, correos, respuestas y puntos) se borran solos 3 días después de terminarla; una sala que nunca se terminó se borra a los 7 días de abierta. Las presentaciones y los proyectos se conservan. Los plazos se cambian en `js/store.js` y en la tarea programada de `supabase/schema.sql`.
+
+Al terminar la sesión, cada participante puede descargar las diapositivas en PDF desde su dispositivo.
 
 El dominio de correo aceptado se cambia en `js/config.js` (`EMAIL_DOMAIN`).
 
 ## Probarla sin configurar nada
 
-Con `js/config.js` vacío, Pulso corre en **modo demostración**: todo se guarda en el navegador y las salas funcionan entre pestañas del mismo equipo. La contraseña de administrador es `demo`.
+Con `js/config.js` vacío, TeachDeck corre en **modo demostración**: todo se guarda en el navegador y las salas funcionan entre pestañas del mismo equipo. La contraseña de administrador es `demo`.
 
 ```bash
 python3 -m http.server 8000   # y abrir http://localhost:8000
@@ -59,7 +61,7 @@ Para volver al modo demostración basta con dejar vacíos los dos valores de `js
 
 ### Capacidad
 
-El plan gratuito de Supabase admite 200 conexiones en vivo simultáneas. Pulso usa esa vía para sincronizar al instante y, si alguien queda fuera del cupo, su dispositivo consulta el estado de la sala cada dos o tres segundos, así que nadie se queda sin seguir la presentación. Para un evento de 200 personas o más conviene el plan Pro durante ese mes (500 conexiones), que además amplía la transferencia de imágenes.
+El plan gratuito de Supabase admite 200 conexiones en vivo simultáneas. TeachDeck usa esa vía para sincronizar al instante y, si alguien queda fuera del cupo, su dispositivo consulta el estado de la sala cada dos o tres segundos, así que nadie se queda sin seguir la presentación. Para un evento de 200 personas o más conviene el plan Pro durante ese mes (500 conexiones), que además amplía la transferencia de imágenes.
 
 ## Subir la presentación
 

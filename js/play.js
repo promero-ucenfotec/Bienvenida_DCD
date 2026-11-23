@@ -36,6 +36,28 @@ export async function play(root, code) {
     if (!TYPES[item.type].continuous) draw();
   }
 
+  // Arma el PDF en el dispositivo con las diapositivas tal como quedaron en la presentación.
+  async function downloadPdf(btn) {
+    const slides = items.filter((i) => i.type === 'slide'), label = btn.lastChild;
+    btn.disabled = true;
+    try {
+      if (!window.jspdf) await new Promise((res, rej) => { const s = document.createElement('script'); s.src = 'vendor/jspdf.umd.min.js'; s.onload = res; s.onerror = rej; document.head.append(s); });
+      let doc;
+      for (const [n, sl] of slides.entries()) {
+        label.textContent = `Preparando ${n + 1} de ${slides.length}…`;
+        const bmp = await createImageBitmap(await (await fetch(sl.data.src)).blob());
+        const c = document.createElement('canvas'); c.width = bmp.width; c.height = bmp.height;
+        const g = c.getContext('2d'); g.fillStyle = '#fff'; g.fillRect(0, 0, c.width, c.height); g.drawImage(bmp, 0, 0);
+        const size = [c.width * 0.75, c.height * 0.75], dir = c.width >= c.height ? 'l' : 'p';
+        if (!doc) doc = new window.jspdf.jsPDF({ unit: 'pt', format: size, orientation: dir, compress: true }); else doc.addPage(size, dir);
+        doc.addImage(c.toDataURL('image/jpeg', 0.86), 'JPEG', 0, 0, size[0], size[1]);
+      }
+      doc.save(`${(session.title || 'Presentación').replace(/[\\/:*?"<>|]/g, '').slice(0, 80)}.pdf`);
+      toast('Se descargó la presentación', 'ok');
+    } catch (e) { console.error(e); toast('No se pudo generar el PDF. Revisá tu conexión.', 'err'); }
+    label.textContent = 'Descargar la presentación en PDF'; btn.disabled = false;
+  }
+
   const wait = (title, text, ic) => h('div.p-wait', ic && h('div.p-badge', icon(ic, 34)), h('h2', title), text && h('p', text));
   function verdict(item, rec) {
     if (!TYPES[item.type].scored) return rec ? wait('¡Gracias por participar!', 'Los resultados están en la pantalla principal.', 'chart') : h('div.verdict.miss', h('h2', 'Sin respuesta'), h('p', 'No participaste en esta actividad.'));
@@ -82,7 +104,8 @@ export async function play(root, code) {
       const r = state.board?.ranks?.[uid], end = state.phase === 'end';
       return set(h('div.p-wait.rank', !r && h('p.eyebrow', end ? 'Resultado final' : 'Clasificación'),
         r ? [h('p', end ? 'Terminaste en el lugar' : 'Vas en el lugar'), h('div.rank-n', String(r[0])), h('p', `con ${fmt(r[1])} puntos`)] : h('p', 'Todavía no tenés puntos en la tabla.'),
-        end && h('p.muted', '¡Gracias por participar!')));
+        end && h('p.muted', '¡Gracias por participar!'),
+        end && items.some((i) => i.type === 'slide') && h('button.btn.primary.big.pdf-btn', { onclick: (e) => downloadPdf(e.currentTarget) }, icon('down', 18), 'Descargar la presentación en PDF')));
     }
     if (!item) return set(wait('Un momento', 'Quien presenta está preparando lo siguiente.', 'clock'));
     markSeen(item.id);

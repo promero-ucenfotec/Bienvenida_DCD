@@ -7,6 +7,10 @@ export const DEMO = !SUPABASE_URL || !SUPABASE_ANON_KEY;
 export const uuid = () => crypto.randomUUID();
 // Días que se conservan los datos de participación de una sala (nombres, correos, respuestas y puntos).
 export const KEEP_DAYS = 3;
+// Una sala que nunca se terminó se borra a los tantos días de abierta.
+export const STALE_DAYS = 7;
+// Fecha en que se borran los datos de una sala: el plazo corre desde que se termina.
+export const purgeDate = (s) => (s.ended && s.ended_at ? new Date(s.ended_at).getTime() + KEEP_DAYS * 864e5 : new Date(s.created_at).getTime() + STALE_DAYS * 864e5);
 
 // En demo cada pestaña es una persona distinta; con Supabase la identidad se conserva por dispositivo.
 export const box = DEMO ? sessionStorage : localStorage;
@@ -117,8 +121,7 @@ function demoStore() {
     },
 
     async purgeOld() {
-      const limit = new Date(Date.now() - KEEP_DAYS * 864e5).toISOString();
-      Object.values(db.sessions).filter((x) => x.created_at < limit).forEach((x) => { mut(['players', x.code], undefined); mut(['answers', x.code], undefined); mut(['sessions', x.code], undefined); });
+      Object.values(db.sessions).filter((x) => purgeDate(x) < Date.now()).forEach((x) => { mut(['players', x.code], undefined); mut(['answers', x.code], undefined); mut(['sessions', x.code], undefined); });
     },
     async listSessions() {
       return clone(Object.values(db.sessions).sort((a, b) => b.created_at.localeCompare(a.created_at)).slice(0, 30));
@@ -136,7 +139,7 @@ function demoStore() {
       return sub('sessions', fire);
     },
     async setState(code, state) { const s = db.sessions[code]; if (s) mut(['sessions', code], { ...s, state: clone(state) }); },
-    async endSession(code) { const s = db.sessions[code]; if (s) mut(['sessions', code], { ...s, ended: true }); },
+    async endSession(code) { const s = db.sessions[code]; if (s && !s.ended) mut(['sessions', code], { ...s, ended: true, ended_at: new Date().toISOString() }); },
 
     async join(code, name, email) { const old = db.players[code]?.[myUid()]; mut(['players', code, myUid()], { seen: [], joined_at: new Date().toISOString(), ...old, uid: myUid(), name, email }); },
     async markSeen(code, seen) { const old = db.players[code]?.[myUid()]; if (old) mut(['players', code, myUid()], { ...old, seen }); },
@@ -237,7 +240,11 @@ function supaStore() {
     },
 
     // Respaldo de la limpieza programada en la base: al borrar la sala se van sus participantes y respuestas.
-    async purgeOld() { ok(await sb.from('sessions').delete().lt('created_at', new Date(Date.now() - KEEP_DAYS * 864e5).toISOString())); },
+    async purgeOld() {
+      const ago = (d) => new Date(Date.now() - d * 864e5).toISOString();
+      ok(await sb.from('sessions').delete().eq('ended', true).lt('ended_at', ago(KEEP_DAYS)));
+      ok(await sb.from('sessions').delete().eq('ended', false).lt('created_at', ago(STALE_DAYS)));
+    },
     async listSessions() {
       const since = new Date(Date.now() - 60 * 24 * 3600e3).toISOString();
       return ok(await sb.from('sessions').select('*').gte('created_at', since).order('created_at', { ascending: false }).limit(30));
@@ -272,7 +279,7 @@ function supaStore() {
       if (ch) ch.send({ type: 'broadcast', event: 'state', payload: state });
       ok(await sb.from('sessions').update({ state }).eq('code', code));
     },
-    async endSession(code) { ok(await sb.from('sessions').update({ ended: true }).eq('code', code)); },
+    async endSession(code) { ok(await sb.from('sessions').update({ ended: true, ended_at: new Date().toISOString() }).eq('code', code).eq('ended', false)); },
 
     async join(code, name, email) { ok(await sb.rpc('join_session', { p_code: code, p_uid: myUid(), p_name: name, p_email: email })); },
     async markSeen(code, seen) { ok(await sb.rpc('mark_seen', { p_code: code, p_uid: myUid(), p_seen: seen })); },

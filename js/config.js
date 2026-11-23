@@ -1,5 +1,5 @@
 // Conexión con Supabase.
-// Mientras estos dos valores estén vacíos, Pulso funciona en modo demostración:
+// Mientras estos dos valores estén vacíos, TeachDeck funciona en modo demostración:
 // todo se guarda solo en este navegador y la contraseña de administrador es "demo".
 //
 // Datos del proyecto en Supabase (Project Settings → API).

@@ -40,7 +40,7 @@ export async function downloadResults(code) {
     const s2 = X.utils.aoa_to_sheet(detail); s2['!cols'] = [{ wch: 32 }, { wch: 34 }, ...acts.map(() => ({ wch: 26 }))];
     X.utils.book_append_sheet(wb, s1, 'Resultados'); X.utils.book_append_sheet(wb, s2, 'Detalle por actividad');
     const day = new Date(session.created_at).toISOString().slice(0, 10);
-    X.writeFile(wb, `Pulso ${(session.title || 'sesión').replace(/[\\/:*?"<>|]/g, '').slice(0, 60)} ${day}.xlsx`);
+    X.writeFile(wb, `TeachDeck ${(session.title || 'sesión').replace(/[\\/:*?"<>|]/g, '').slice(0, 60)} ${day}.xlsx`);
     toast(rows.length === 1 ? 'Se descargó el registro de 1 participante' : `Se descargó el registro de ${rows.length} participantes`, 'ok');
   } catch (e) { console.error(e); toast('No se pudo generar el archivo.', 'err'); }
   note.remove();
