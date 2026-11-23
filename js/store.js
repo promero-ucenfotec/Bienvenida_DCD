@@ -5,6 +5,8 @@ import { SUPABASE_URL, SUPABASE_ANON_KEY } from './config.js';
 
 export const DEMO = !SUPABASE_URL || !SUPABASE_ANON_KEY;
 export const uuid = () => crypto.randomUUID();
+// Días que se conservan los datos de participación de una sala (nombres, correos, respuestas y puntos).
+export const KEEP_DAYS = 3;
 
 // En demo cada pestaña es una persona distinta; con Supabase la identidad se conserva por dispositivo.
 export const box = DEMO ? sessionStorage : localStorage;
@@ -114,6 +116,10 @@ function demoStore() {
       return new Promise((res) => { const r = new FileReader(); r.onload = () => res(r.result); r.readAsDataURL(blob); });
     },
 
+    async purgeOld() {
+      const limit = new Date(Date.now() - KEEP_DAYS * 864e5).toISOString();
+      Object.values(db.sessions).filter((x) => x.created_at < limit).forEach((x) => { mut(['players', x.code], undefined); mut(['answers', x.code], undefined); mut(['sessions', x.code], undefined); });
+    },
     async listSessions() {
       return clone(Object.values(db.sessions).sort((a, b) => b.created_at.localeCompare(a.created_at)).slice(0, 30));
     },
@@ -230,6 +236,8 @@ function supaStore() {
       return sb.storage.from('slides').getPublicUrl(path).data.publicUrl;
     },
 
+    // Respaldo de la limpieza programada en la base: al borrar la sala se van sus participantes y respuestas.
+    async purgeOld() { ok(await sb.from('sessions').delete().lt('created_at', new Date(Date.now() - KEEP_DAYS * 864e5).toISOString())); },
     async listSessions() {
       const since = new Date(Date.now() - 60 * 24 * 3600e3).toISOString();
       return ok(await sb.from('sessions').select('*').gte('created_at', since).order('created_at', { ascending: false }).limit(30));

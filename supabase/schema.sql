@@ -137,3 +137,8 @@ drop policy if exists "slides lectura" on storage.objects;
 drop policy if exists "slides admin" on storage.objects;
 create policy "slides lectura" on storage.objects for select to anon, authenticated using (bucket_id = 'slides');
 create policy "slides admin" on storage.objects for all to authenticated using (bucket_id = 'slides') with check (bucket_id = 'slides');
+
+-- Limpieza automática: a los 3 días de abierta una sala se borran sus datos de participación
+-- (participantes, correos, respuestas y puntos). Las presentaciones y los proyectos se conservan.
+create extension if not exists pg_cron;
+select cron.schedule('pulso-limpieza', '15 * * * *', $$delete from public.sessions where created_at < now() - interval '3 days'$$);

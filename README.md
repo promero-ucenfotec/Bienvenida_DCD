@@ -34,6 +34,8 @@ Quien participa puede repasar lo ya visto con las flechas inferiores y regresar 
 
 El botón **Excel** de la sala, o **Descargar resultados** en la biblioteca, genera un archivo con una fila por participante: lugar, nombre, correo institucional, puntos, nota de 0 a 100, actividades respondidas y porcentaje de avance en la presentación. Una segunda hoja detalla los puntos por actividad.
 
+Los datos de participación de cada sala (nombres, correos, respuestas y puntos) se borran solos a los 3 días de abierta; las presentaciones y los proyectos se conservan. El plazo se cambia en `KEEP_DAYS` de `js/store.js` y en la tarea programada de `supabase/schema.sql`.
+
 El dominio de correo aceptado se cambia en `js/config.js` (`EMAIL_DOMAIN`).
 
 ## Probarla sin configurar nada

@@ -165,3 +165,8 @@ export function askText(title, label, value = '', okLabel = 'Guardar') {
     document.body.append(dlg); dlg.showModal(); input.select();
   });
 }
+Object.assign(P, {
+  tap: 'M9 11V5.5a1.5 1.5 0 0 1 3 0V11m0-1.5a1.5 1.5 0 0 1 3 0V11m0-.5a1.5 1.5 0 0 1 3 0V15a6 6 0 0 1-6 6h-.8a5 5 0 0 1-4-2L5 15.5a1.6 1.6 0 0 1 2.5-2L9 15',
+  up: 'M6 14l6-6 6 6',
+  dn: 'M6 10l6 6 6-6',
+});

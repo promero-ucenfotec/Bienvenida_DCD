@@ -221,6 +221,7 @@ function bank(d, seed) {
 // ctx: { uid, rec, submit(value, frac) }. Devuelve { el, draft? } donde draft() entrega una respuesta a medio hacer.
 export function player(item, ctx) {
   const d = item.data, seed = ctx.uid + item.id;
+  const how = (text) => h('p.p-how', icon('tap', 20), h('span', text));
   const sendBtn = (onclick, label = 'Enviar respuesta') => h('button.btn.primary.block.send', { type: 'button', onclick }, label);
 
   if (item.type === 'quiz' || item.type === 'poll') {
@@ -233,7 +234,7 @@ export function player(item, ctx) {
     } }, shape(o.i, 26), h('span', o.t)));
     const send = multi && sendBtn(() => ctx.submit([...picked], grade([...picked])));
     if (send) send.disabled = true;
-    return { el: h('div.p-act', multi && h('p.p-hint', 'Hay más de una correcta. Marcá todas y enviá.'), h('div.answers', { class: `n${opts.length}` }, btns), send) };
+    return { el: h('div.p-act', how(item.type === 'poll' ? 'Tocá la opción que elegís.' : multi ? 'Hay más de una correcta: tocá todas las que correspondan y después «Enviar respuesta».' : 'Tocá la respuesta correcta. Entre más rápido, más puntos.'), h('div.answers', { class: `n${opts.length}` }, btns), send) };
   }
 
   if (item.type === 'open') {
@@ -246,7 +247,7 @@ export function player(item, ctx) {
       form.hidden = left <= 0; note.textContent = left <= 0 ? 'Listo, ya enviaste todas tus respuestas.' : sent.length ? (left === 1 ? 'Podés enviar una más.' : `Podés enviar ${left} más.`) : '';
     };
     const go = (e) => { e?.preventDefault(); const t = input.value.trim(); if (!t || sent.length >= max) return; sent.push(t); input.value = ''; ctx.submit([...sent], null); draw(); if (sent.length < max) input.focus(); };
-    const form = h('form.open-form', { onsubmit: go }, input, h('button.btn.primary.block', { type: 'submit' }, 'Enviar'));
+    const form = h('form.open-form', { onsubmit: go }, how(wall ? 'Escribí tu idea y tocá «Enviar». Aparece en la pantalla principal.' : 'Escribí una palabra o frase corta y tocá «Enviar». Aparece en la pantalla principal.'), input, h('button.btn.primary.block', { type: 'submit' }, 'Enviar'));
     if (!wall) input.addEventListener('keydown', (e) => { if (e.key === 'Enter') go(e); });
     const note = h('p.p-hint');
     const el = h('div.p-act', form, note, list); draw();
@@ -255,12 +256,17 @@ export function player(item, ctx) {
 
   if (item.type === 'match') {
     const ps = goodPairs(d), ord = shuffled(ps.length, seed);
-    const right = h('div.m-col.m-drag', ord.map((i) => h('div.m-item', { 'data-key': String(i) }, h('span.grip', { html: '<svg width="14" height="20" viewBox="0 0 14 20" fill="currentColor"><circle cx="4" cy="4" r="1.6"/><circle cx="10" cy="4" r="1.6"/><circle cx="4" cy="10" r="1.6"/><circle cx="10" cy="10" r="1.6"/><circle cx="4" cy="16" r="1.6"/><circle cx="10" cy="16" r="1.6"/></svg>' }), h('span', ps[i].b))));
+    const grip = '<svg width="14" height="20" viewBox="0 0 14 20" fill="currentColor"><circle cx="4" cy="4" r="1.6"/><circle cx="10" cy="4" r="1.6"/><circle cx="4" cy="10" r="1.6"/><circle cx="10" cy="10" r="1.6"/><circle cx="4" cy="16" r="1.6"/><circle cx="10" cy="16" r="1.6"/></svg>';
+    const arrows = () => { [...right.children].forEach((c, k, all) => { c.querySelector('.m-up').disabled = k === 0; c.querySelector('.m-down').disabled = k === all.length - 1; }); };
+    const step = (el, d) => { const o = d < 0 ? el.previousElementSibling : el.nextElementSibling; if (!o) return; right.insertBefore(d < 0 ? el : o, d < 0 ? o : el); touched = true; arrows(); };
+    const right = h('div.m-col.m-drag', ord.map((i) => { const el = h('div.m-item', { 'data-key': String(i) }, h('span.grip', { html: grip }), h('span', ps[i].b),
+      h('span.m-arrows', h('button.m-up', { type: 'button', 'aria-label': 'Subir', onclick: () => step(el, -1) }, icon('up')), h('button.m-down', { type: 'button', 'aria-label': 'Bajar', onclick: () => step(el, 1) }, icon('dn')))); return el; }));
     let touched = false;
-    sortable(right, { onDrop: () => { touched = true; } });
+    sortable(right, { onDrop: () => { touched = true; arrows(); } }); arrows();
     const read = () => { const v = [...right.children].map((c) => +c.dataset.key); return { value: v, frac: v.filter((x, i) => x === i).length / ps.length }; };
     return {
-      el: h('div.p-act', h('p.p-hint', 'Arrastrá las tarjetas de la derecha hasta dejarlas frente a su pareja.'),
+      el: h('div.p-act', how('Subí o bajá las tarjetas blancas con las flechas hasta que cada una quede al lado de su pareja. Las oscuras no se mueven.'),
+        h('div.m-heads', h('span', 'Concepto'), h('span', 'Su pareja')),
         h('div.m-grid', h('div.m-col', ps.map((p) => h('div.m-item.fixed', h('span', p.a)))), right),
         sendBtn(() => { const r = read(); ctx.submit(r.value, r.frac); })),
       draft: () => (touched ? read() : null),
@@ -285,7 +291,8 @@ export function player(item, ctx) {
     };
     draw();
     if (isL) { line.classList.add('letters'); chips.classList.add('letters'); }
-    return { el: h('div.p-act', line, chips, send), draft: () => (slots.some((s) => s != null) ? read() : null) };
+    const tip = isFill ? 'Tocá una palabra para colocarla en el primer espacio vacío. Si te equivocás, tocá el espacio para quitarla.' : isL ? 'Tocá las letras en orden para formar la palabra. Tocá una letra ya colocada para devolverla.' : 'Tocá las palabras en el orden correcto. Tocá una palabra ya colocada para devolverla.';
+    return { el: h('div.p-act', how(tip), line, chips, send), draft: () => (slots.some((s) => s != null) ? read() : null) };
   }
 
   if (item.type === 'pairs') {
@@ -308,7 +315,7 @@ export function player(item, ctx) {
       } }, h('span.card-in', h('span.card-back'), h('span.card-face', c.t)));
       return el;
     });
-    return { el: h('div.p-act', info, h('div.cards', { class: `n${cards.length}` }, els)) };
+    return { el: h('div.p-act', how('Tocá dos tarjetas para voltearlas. Si forman pareja quedan descubiertas; si no, se vuelven a tapar.'), info, h('div.cards', { class: `n${cards.length}` }, els)) };
   }
   if (item.type === 'frog') {
     const qs = goodFrog(d), n = qs.length;
@@ -331,7 +338,7 @@ export function player(item, ctx) {
       } }, h('span', o.t)); return pad; });
       put(el, h('div.pond',
         h('div.pond-top', h('span.pond-steps', qs.map((_, k) => h('i', { class: k < i ? 'on' : k === i ? 'now' : '' }))), h('span.pond-lives', { 'aria-label': `${lives} vidas` }, [0, 1, 2].map((k) => h('i', { class: k < lives ? 'on' : '' })))),
-        h('p.pond-q', x.q), h('div.pond-pads', pads), h('div.pond-home', me)));
+        h('p.pond-q', x.q), i === 0 && h('p.pond-tip', 'Tocá la hoja con la respuesta correcta'), h('div.pond-pads', pads), h('div.pond-home', me)));
     };
     draw();
     return { el };

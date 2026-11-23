@@ -1,5 +1,5 @@
 // Portada para participantes, ingreso de administradores y biblioteca de presentaciones.
-import { store, DEMO, box, uuid } from './store.js';
+import { store, DEMO, KEEP_DAYS, box, uuid } from './store.js';
 import { EMAIL_DOMAIN } from './config.js';
 import { downloadResults } from './report.js';
 import { h, put, icon, toast, confirmBox, askText, shape } from './ui.js';
@@ -92,11 +92,13 @@ export async function library(root) {
       h('option', { value: '' }, 'Mover a…'), projects.filter((x) => x.id !== p.project_id).map((x) => h('option', { value: x.id }, x.name)), p.project_id && h('option', { value: '-' }, 'Sin proyecto')));
 
   async function load() {
+    await store.purgeOld().catch(() => {});
+    const left = (s) => { const d = Math.ceil(KEEP_DAYS - (Date.now() - new Date(s.created_at)) / 864e5); return d <= 1 ? 'Se borra hoy' : `Se borra en ${d} días`; };
     const [list, sessions, projects] = await Promise.all([store.listPresentations(), store.listSessions(), store.listProjects()]);
     live.hidden = !sessions.length;
-    put(live, h('h2', 'Salas y registros'), h('div.live-list', sessions.map((s) => h('div.live-row', { class: s.ended ? 'closed' : '' },
+    put(live, h('h2', 'Salas y registros'), h('p.live-note', `Los datos de participación se borran solos a los ${KEEP_DAYS} días de abierta la sala. Descargá el Excel antes si necesitás conservarlos; las presentaciones no se tocan.`), h('div.live-list', sessions.map((s) => h('div.live-row', { class: s.ended ? 'closed' : '' },
       h('span.live-dot'), h('b.live-code', s.code.slice(0, 3) + ' ' + s.code.slice(3)), h('span.live-title', s.title || 'Sin título'),
-      h('span.live-date', new Date(s.created_at).toLocaleDateString('es-CR', { day: 'numeric', month: 'short' })),
+      h('span.live-date', left(s)),
       !s.ended && h('a.btn.soft.small', { href: '#/host/' + s.code }, 'Entrar a presentar'),
       h('button.btn.ghost.small', { onclick: () => downloadResults(s.code) }, icon('down', 16), 'Descargar resultados'),
       !s.ended && h('button.btn.ghost.small', { onclick: async () => { await store.endSession(s.code).catch(() => {}); load(); } }, 'Cerrar sala')))));

@@ -62,14 +62,22 @@ export async function editor(root, pid) {
   const film = h('div.film-list'), canvas = h('section.ed-canvas'), side = h('aside.ed-side');
   const menu = h('div.add-menu', { hidden: true }, ACTIVITY_TYPES.map((t) => h('button', { type: 'button', onclick: () => { menu.hidden = true; addActivity(t); } },
     h('span.add-ic', { class: 't-' + t }, icon(TYPES[t].icon, 20)), h('span', h('b', TYPES[t].label), h('small', TYPES[t].hint)))));
-  const addBtn = h('button.btn.soft.block', { type: 'button', 'aria-haspopup': 'true', onclick: (e) => { e.stopPropagation(); menu.hidden = !menu.hidden; } }, icon('plus', 18), 'Agregar actividad');
+  // El menú flota junto al botón que lo abrió: el inferior o el «+» entre dos elementos.
+  const openMenu = (anchor, beside) => {
+    if (!menu.hidden && menu.dataset.from === (beside ? 'in' : 'end')) { menu.hidden = true; return; }
+    menu.hidden = false; menu.dataset.from = beside ? 'in' : 'end';
+    const r = anchor.getBoundingClientRect(), mh = menu.offsetHeight, mw = menu.offsetWidth;
+    const top = beside ? r.top - 40 : r.top - mh - 6, left = beside ? r.right + 10 : r.left;
+    menu.style.top = Math.max(8, Math.min(top, innerHeight - mh - 8)) + 'px'; menu.style.left = Math.max(8, Math.min(left, innerWidth - mw - 8)) + 'px';
+  };
+  const addBtn = h('button.btn.soft.block', { type: 'button', 'aria-haspopup': 'true', onclick: (e) => { e.stopPropagation(); openMenu(e.currentTarget, false); } }, icon('plus', 18), 'Agregar actividad');
   const shell = h('div.editor',
     h('header.ed-top',
       h('a.icon-btn', { href: '#/admin', title: 'Mis presentaciones' }, icon('back')),
       titleIn, status,
       h('button.btn.ghost', { type: 'button', onclick: () => fileIn.click() }, icon('upload', 18), 'Subir PDF o imágenes'),
       h('button.btn.primary', { type: 'button', onclick: present }, icon('play', 16), 'Presentar')),
-    h('nav.ed-film', film, h('div.film-add', menu, addBtn)),
+    h('nav.ed-film', film, h('div.film-add', addBtn)), menu,
     canvas, side, fileIn);
   root.append(shell);
   const closeMenu = () => { menu.hidden = true; };
@@ -85,13 +93,15 @@ export async function editor(root, pid) {
   function drawFilm() {
     put(film, ...items.map((it, i) => {
       const bad = problem(it);
-      return h('div.film-item', { 'data-key': it.id, class: `${it.id === selId ? 'on' : ''} ${it.type === 'slide' ? '' : 'is-act'}`, tabindex: '0', role: 'button', 'aria-label': `${i + 1}. ${titleOf(it)}`,
+      const el = h('div.film-item', { 'data-key': it.id, class: `${it.id === selId ? 'on' : ''} ${it.type === 'slide' ? '' : 'is-act'}`, tabindex: '0', role: 'button', 'aria-label': `${i + 1}. ${titleOf(it)}`,
         onclick: () => select(it.id), onkeydown: (e) => { if (e.key === 'Enter') select(it.id); if (e.key === 'Delete') remove(it); } },
         h('span.film-n', String(i + 1)),
         it.type === 'slide' ? h('span.film-thumb', it.thumb ? h('img', { src: it.thumb, alt: '', draggable: false }) : icon('image'))
           : h('span.film-thumb.act', { class: 't-' + it.type }, icon(TYPES[it.type].icon, 20), h('small', TYPES[it.type].label), h('em', it.data.q || '')),
         bad && h('span.film-warn', { title: bad }, '!'));
+      return it.id === selId ? [el, h('button.film-plus', { type: 'button', title: 'Agregar una actividad después de este elemento', onclick: (e) => { e.stopPropagation(); openMenu(e.currentTarget, true); } }, icon('plus', 14), 'Agregar aquí')] : el;
     }));
+    film.addEventListener('scroll', closeMenu, { once: true });
   }
 
   function drawCanvas() {
