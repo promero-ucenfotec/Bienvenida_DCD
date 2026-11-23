@@ -32,9 +32,14 @@ create table if not exists players (
   session_code text not null references sessions(code) on delete cascade,
   uid uuid not null,
   name text not null check (char_length(name) between 1 and 60),
+  email text check (char_length(email) <= 120),
+  seen jsonb not null default '[]',
   joined_at timestamptz not null default now(),
   primary key (session_code, uid)
 );
+
+alter table players add column if not exists email text;
+alter table players add column if not exists seen jsonb not null default '[]';
 
 create table if not exists answers (
   session_code text not null references sessions(code) on delete cascade,

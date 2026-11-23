@@ -16,6 +16,19 @@ Presentaciones en vivo para grupos grandes: diapositivas con actividades interca
 | Completar la oración | Llena los espacios con un banco de palabras |
 | Formar la oración | Ordena las palabras revueltas |
 | Parejas | Juega memoria con tarjetas |
+| Rana saltarina | Responde una serie de preguntas; la rana salta con cada acierto y tiene tres vidas |
+| Sopa de letras | Encuentra las palabras escondidas en la cuadrícula |
+| Palabra secreta | Ordena las letras revueltas a partir de una pista |
+
+## Puntos, clasificación y registro
+
+Cada actividad vale hasta 1000 puntos: la mitad depende del acierto y la otra mitad de la rapidez dentro del tiempo asignado. Al mostrar los resultados, cada participante ve su lugar en la tabla.
+
+Quien participa puede repasar lo ya visto con las flechas inferiores y regresar con **Volver al en vivo**; una actividad nueva lo trae de vuelta sola.
+
+El botón **Excel** de la sala, o **Descargar resultados** en la biblioteca, genera un archivo con una fila por participante: lugar, nombre, correo institucional, puntos, nota de 0 a 100, actividades respondidas y porcentaje de avance en la presentación. Una segunda hoja detalla los puntos por actividad.
+
+El dominio de correo aceptado se cambia en `js/config.js` (`EMAIL_DOMAIN`).
 
 ## Probarla sin configurar nada
 
@@ -52,6 +65,7 @@ js/activities.js    tipos de actividad
 js/editor.js        editor de presentaciones
 js/host.js          vista de quien presenta
 js/play.js          vista de quien participa
+js/report.js        exportación de resultados a Excel
 supabase/schema.sql base de datos
 vendor/             bibliotecas y tipografías incluidas
 ```

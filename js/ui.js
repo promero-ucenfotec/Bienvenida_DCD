@@ -144,3 +144,10 @@ export const norm = (s) => String(s ?? '').trim().toLowerCase().normalize('NFD')
 
 // Reemplaza el contenido de un nodo ignorando valores vacíos.
 export function put(el, ...kids) { el.replaceChildren(...kids.flat(Infinity).filter((c) => c != null && c !== false)); return el; }
+Object.assign(P, {
+  down: 'M12 4v12M7 11l5 5 5-5M4 20h16',
+  search: 'M11 18a7 7 0 1 0 0-14 7 7 0 0 0 0 14M20 20l-4-4',
+  letters: 'M3 18l4-12 4 12M4.5 14h5M14 10h6l-6 8h6',
+  frog: 'M4 13c0-2.5 1.2-4 2.5-4.6M20 13c0-2.5-1.2-4-2.5-4.6M4 13c0 4 3.5 6 8 6s8-2 8-6M6 9a2.5 2.5 0 1 1 5 0M13 9a2.5 2.5 0 1 1 5 0M9 14.5c2 1 4 1 6 0',
+  live: 'M12 14a2 2 0 1 0 0-4 2 2 0 0 0 0 4M7.5 16.5a6.4 6.4 0 0 1 0-9M16.5 7.5a6.4 6.4 0 0 1 0 9M4.6 19.4a10.5 10.5 0 0 1 0-14.8M19.4 4.6a10.5 10.5 0 0 1 0 14.8',
+});

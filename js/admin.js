@@ -1,5 +1,7 @@
 // Portada para participantes, ingreso de administradores y biblioteca de presentaciones.
 import { store, DEMO, box } from './store.js';
+import { EMAIL_DOMAIN } from './config.js';
+import { downloadResults } from './report.js';
 import { h, put, icon, toast, confirmBox, shape } from './ui.js';
 
 const brand = (cls = '') => h('a.brand', { href: '#/', class: cls }, h('span.brand-mark'), 'Pulso');
@@ -8,25 +10,29 @@ export function home(root, preset = '') {
   const code = h('input.inp.code-in', { inputMode: 'numeric', autocomplete: 'off', maxLength: 7, placeholder: '000 000', value: preset ? preset.slice(0, 3) + ' ' + preset.slice(3) : '', 'aria-label': 'Código de la sala',
     oninput: (e) => { const d = e.target.value.replace(/\D/g, '').slice(0, 6); e.target.value = d.length > 3 ? d.slice(0, 3) + ' ' + d.slice(3) : d; } });
   const name = h('input.inp.big', { autocomplete: 'name', maxLength: 60, placeholder: 'Nombre y apellido', value: box.getItem('pulso.name') || '', 'aria-label': 'Tu nombre completo' });
+  const email = h('input.inp.big', { type: 'email', inputMode: 'email', autocomplete: 'email', autocapitalize: 'off', maxLength: 120, placeholder: 'usuario@' + EMAIL_DOMAIN, value: box.getItem('pulso.email') || '', 'aria-label': 'Tu correo institucional' });
   const err = h('p.form-err', { role: 'alert' });
   const btn = h('button.btn.primary.block.big', { type: 'submit' }, 'Entrar a la sala');
   const form = h('form.join-form', { onsubmit: async (e) => {
     e.preventDefault(); err.textContent = '';
     const c = code.value.replace(/\D/g, ''), n = name.value.trim().replace(/\s+/g, ' ');
     if (c.length !== 6) { err.textContent = 'El código tiene seis dígitos.'; return code.focus(); }
-    if (n.length < 3) { err.textContent = 'Escribí tu nombre completo.'; return name.focus(); }
+    if (n.length < 3 || !n.includes(' ')) { err.textContent = 'Escribí tu nombre y apellido.'; return name.focus(); }
+    const m = email.value.trim().toLowerCase();
+    if (!new RegExp('^[a-z0-9._%+-]+@' + EMAIL_DOMAIN.replace(/\./g, '\\.') + '$').test(m)) { err.textContent = `Usá tu correo institucional, el que termina en @${EMAIL_DOMAIN}.`; return email.focus(); }
     btn.disabled = true;
     try {
       const s = await store.getSession(c);
       if (!s) throw new Error('No hay ninguna sala con ese código.');
       if (s.ended) throw new Error('Esa sesión ya terminó.');
-      await store.join(c, n);
-      box.setItem('pulso.name', n); box.setItem('pulso.in', c); location.hash = '#/play/' + c;
+      await store.join(c, n, m);
+      box.setItem('pulso.name', n); box.setItem('pulso.email', m); box.setItem('pulso.in', c); location.hash = '#/play/' + c;
     } catch (x) { err.textContent = x.message?.includes('sala') || x.message?.includes('sesión') ? x.message : 'No se pudo entrar. Revisá tu conexión.'; btn.disabled = false; }
   } },
     h('h1', 'Entrá a la sala'),
     h('label.field', h('span.lbl', 'Código'), code),
-    h('label.field', h('span.lbl', 'Tu nombre'), name),
+    h('label.field', h('span.lbl', 'Nombre completo'), name),
+    h('label.field', h('span.lbl', 'Correo institucional'), email),
     err, btn);
   root.append(h('main.home',
     h('section.home-art', { 'aria-hidden': 'true' }, brand('light'),
@@ -66,10 +72,12 @@ export async function library(root) {
   async function load() {
     const [list, sessions] = await Promise.all([store.listPresentations(), store.listSessions()]);
     live.hidden = !sessions.length;
-    put(live, h('h2', 'Salas abiertas'), h('div.live-list', sessions.map((s) => h('div.live-row',
+    put(live, h('h2', 'Salas y registros'), h('div.live-list', sessions.map((s) => h('div.live-row', { class: s.ended ? 'closed' : '' },
       h('span.live-dot'), h('b.live-code', s.code.slice(0, 3) + ' ' + s.code.slice(3)), h('span.live-title', s.title || 'Sin título'),
-      h('a.btn.soft.small', { href: '#/host/' + s.code }, 'Entrar a presentar'),
-      h('button.btn.ghost.small', { onclick: async () => { await store.endSession(s.code).catch(() => {}); load(); } }, 'Cerrar sala')))));
+      h('span.live-date', new Date(s.created_at).toLocaleDateString('es-CR', { day: 'numeric', month: 'short' })),
+      !s.ended && h('a.btn.soft.small', { href: '#/host/' + s.code }, 'Entrar a presentar'),
+      h('button.btn.ghost.small', { onclick: () => downloadResults(s.code) }, icon('down', 16), 'Descargar resultados'),
+      !s.ended && h('button.btn.ghost.small', { onclick: async () => { await store.endSession(s.code).catch(() => {}); load(); } }, 'Cerrar sala')))));
     put(grid, ...(list.length ? list.map((p) => h('article.lib-card',
       h('a.lib-cover', { href: '#/edit/' + p.id, 'aria-label': `Editar ${p.title}` }, p.cover ? h('img', { src: p.cover, alt: '' }) : h('span.lib-blank', [0, 1, 2].map((i) => h('i', { class: 'c' + i })))),
       h('div.lib-info', h('h3', p.title), h('p.muted', p.count === 1 ? '1 elemento' : `${p.count} elementos`)),

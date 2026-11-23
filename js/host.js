@@ -2,6 +2,7 @@
 import { store } from './store.js';
 import { h, put, icon, toast, fmt, confirmBox } from './ui.js';
 import { TYPES, stage, problem, titleOf } from './activities.js';
+import { downloadResults } from './report.js';
 
 const joinUrl = (code) => location.origin + location.pathname + '#/' + code;
 const prettyCode = (c) => c.slice(0, 3) + ' ' + c.slice(3);
@@ -44,12 +45,13 @@ export async function host(root, code) {
     next() {
       if (state.phase === 'lobby') return show(0);
       if (state.phase === 'board') return act.toggleBoard();
-      if (state.phase === 'active' && TYPES[cur()?.type]?.scored) return go({ phase: 'reveal' });
+      if (state.phase === 'active' && TYPES[cur()?.type]?.scored) return act.reveal();
       if (idx() < items.length - 1) return show(idx() + 1);
       return act.end();
     },
     prev() { if (state.phase === 'board') return act.toggleBoard(); if (idx() > 0) show(idx() - 1); },
-    reveal() { go({ phase: 'reveal' }); },
+    // Al mostrar resultados se recalcula la tabla, así cada participante ve su lugar de inmediato.
+    async reveal() { const id = state.itemId; const b = await board(); if (state.itemId === id && state.phase === 'active') go({ phase: 'reveal', board: b }); },
     async toggleBoard() {
       if (state.phase === 'board') return go({ phase: state.back || 'slide', board: null });
       const b = await board();
@@ -113,9 +115,10 @@ export async function host(root, code) {
         h('div.h-right',
           h('button.hbtn.txt', { title: 'Lista de contenido', disabled: ended, 'aria-pressed': String(drawer), onclick: () => { drawer = !drawer; sig = ''; draw(); } }, icon('grid', 18), 'Contenido'),
           h('button.hbtn.txt', { title: 'Clasificación', disabled: ended || state.phase === 'lobby', 'aria-pressed': String(state.phase === 'board'), onclick: act.toggleBoard }, icon('trophy', 18), 'Clasificación'),
+          h('button.hbtn.txt', { title: 'Descargar resultados en Excel', disabled: state.phase === 'lobby', onclick: () => downloadResults(code) }, icon('down', 18), 'Excel'),
           h('button.hbtn', { title: 'Pantalla completa (F)', onclick: fullscreen }, icon('expand', 18)),
           !ended && h('button.hbtn.txt', { title: 'Terminar la sesión', onclick: act.end }, icon('stop', 16), 'Terminar'),
-          ended ? h('a.btn.primary.big', { href: '#/admin' }, 'Volver a mis presentaciones')
+          ended ? h('button.btn.primary.big', { onclick: () => downloadResults(code) }, icon('down', 18), 'Descargar resultados')
             : h('button.btn.primary.big', { disabled: state.phase === 'lobby' && !items.length, onclick: act.next }, primaryLabel(), icon('right', 18))));
     }
     if (isAct) put(ansEl, h('b', String(answers.length)), ` de ${players.length} respondieron`);

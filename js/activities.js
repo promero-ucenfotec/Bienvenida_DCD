@@ -1,5 +1,5 @@
 // Tipos de actividad: datos iniciales, formulario de edición, vista de pantalla y vista de participante.
-import { h, put, icon, shape, shuffled, norm, sortable } from './ui.js';
+import { h, put, icon, shape, shuffled, seeded, norm, sortable } from './ui.js';
 
 const pairsSeed = () => [{ a: '', b: '' }, { a: '', b: '' }, { a: '', b: '' }];
 export const TYPES = {
@@ -18,6 +18,12 @@ export const TYPES = {
     make: () => ({ q: 'Ordená las palabras', sentence: '', time: 45 }) },
   pairs: { label: 'Parejas', hint: 'Juego de memoria con tarjetas', icon: 'cards', scored: true, continuous: true,
     make: () => ({ q: 'Encontrá las parejas', pairs: pairsSeed(), time: 90 }) },
+  frog: { label: 'Rana saltarina', hint: 'Varias preguntas: la rana salta con cada acierto', icon: 'frog', scored: true, continuous: true,
+    make: () => ({ q: 'Ayudá a la rana a cruzar el estanque', questions: [{ q: '', options: ['', '', ''], ok: 0 }, { q: '', options: ['', '', ''], ok: 0 }], time: 90 }) },
+  soup: { label: 'Sopa de letras', hint: 'Encontrar las palabras escondidas', icon: 'search', scored: true, continuous: true,
+    make: () => ({ q: 'Encontrá las palabras escondidas', words: '', time: 120 }) },
+  letters: { label: 'Palabra secreta', hint: 'Ordenar las letras a partir de una pista', icon: 'letters', scored: true,
+    make: () => ({ q: '', word: '', time: 30 }) },
 };
 export const ACTIVITY_TYPES = Object.keys(TYPES).filter((t) => t !== 'slide');
 
@@ -25,6 +31,27 @@ export const fillParts = (text) => String(text || '').split(/\[([^\]]+)\]/).map(
 export const words = (s) => String(s || '').trim().split(/\s+/).filter(Boolean);
 const goodPairs = (d) => (d.pairs || []).filter((p) => p.a?.trim() && p.b?.trim());
 const goodOpts = (d) => (d.options || []).filter((o) => o.t?.trim());
+const goodFrog = (d) => (d.questions || []).filter((x) => x.q?.trim() && (x.options || []).filter((o) => o?.trim()).length >= 2 && x.options[x.ok]?.trim());
+export const soupWords = (d) => [...new Set(String(d.words || '').split(/[,;\n]/).map((w) => norm(w).toUpperCase().replace(/[^A-Z]/g, '')).filter((w) => w.length >= 3 && w.length <= 10))].slice(0, 8);
+const letterList = (d) => [...String(d.word || '').trim().toUpperCase()].filter((c) => c.trim());
+
+// Sopa de letras: la misma semilla produce siempre la misma cuadrícula, así la pantalla y los celulares coinciden.
+export function makeGrid(wordList, seed) {
+  const ws = [...wordList].sort((a, b) => b.length - a.length), size = Math.min(10, Math.max(8, (ws[0]?.length || 0) + 1));
+  const r = seeded(seed), cells = Array(size * size).fill(''), placed = [], dirs = [[1, 0], [0, 1], [1, 1], [1, -1]];
+  for (const w of ws) for (let t = 0; t < 400; t++) {
+    const [dx, dy] = dirs[Math.floor(r() * dirs.length)], x = Math.floor(r() * size), y = Math.floor(r() * size);
+    const ex = x + dx * (w.length - 1), ey = y + dy * (w.length - 1);
+    if (ex < 0 || ex >= size || ey < 0 || ey >= size) continue;
+    const idx = [...w].map((_, k) => (y + dy * k) * size + x + dx * k);
+    if (idx.some((i, k) => cells[i] && cells[i] !== w[k])) continue;
+    idx.forEach((i, k) => { cells[i] = w[k]; }); placed.push({ w, idx }); break;
+  }
+  const abc = 'AEIOUAEIOSRNLDCTMPBGVHFJ';
+  return { size, cells: cells.map((c) => c || abc[Math.floor(r() * abc.length)]), placed };
+}
+const FROG = '<svg viewBox="0 0 64 56" width="100%" height="100%"><ellipse cx="32" cy="36" rx="24" ry="17" fill="#35b85a"/><circle cx="20" cy="17" r="9.5" fill="#35b85a"/><circle cx="44" cy="17" r="9.5" fill="#35b85a"/><ellipse cx="32" cy="42" rx="14" ry="8" fill="#c9f5b4" opacity=".6"/><circle cx="20" cy="16" r="5.4" fill="#fff"/><circle cx="44" cy="16" r="5.4" fill="#fff"/><circle cx="21" cy="16" r="2.6" fill="#17143a"/><circle cx="45" cy="16" r="2.6" fill="#17143a"/><path d="M22 36c6 5 14 5 20 0" fill="none" stroke="#17143a" stroke-width="2.6" stroke-linecap="round"/></svg>';
+const frog = () => h('span.frog', { 'aria-hidden': 'true', html: FROG });
 
 // Devuelve lo que le falta a la actividad para poder presentarse, o null si está lista.
 export function problem(item) {
@@ -37,6 +64,9 @@ export function problem(item) {
     case 'match': case 'pairs': return goodPairs(d).length < 2 ? 'Completá al menos dos parejas' : null;
     case 'fill': return fillParts(d.text).some((p) => p.blank) ? null : 'Marcá al menos un espacio entre corchetes';
     case 'order': return words(d.sentence).length < 3 ? 'Escribí una oración de tres palabras o más' : null;
+    case 'frog': return goodFrog(d).length ? null : 'Completá al menos una pregunta con sus opciones';
+    case 'soup': return soupWords(d).length < 2 ? 'Escribí al menos dos palabras de 3 a 10 letras' : null;
+    case 'letters': if (!d.q?.trim()) return 'Falta la pista'; return letterList(d).length < 3 || letterList(d).length > 14 ? 'Escribí una palabra de 3 a 14 letras' : null;
   }
   return null;
 }
@@ -55,7 +85,7 @@ export function editorForm(item, commit) {
   const add = (label, fn) => h('button.btn.soft.small', { type: 'button', onclick: () => { fn(); commit(true); } }, icon('plus', 16), label);
   const out = [];
 
-  if (item.type !== 'slide') out.push(field(item.type === 'quiz' || item.type === 'poll' || item.type === 'open' ? 'Pregunta' : 'Indicación', inp(d, 'q', 'Escribí aquí lo que verá el grupo', true)));
+  if (item.type !== 'slide') out.push(field(item.type === 'letters' ? 'Pista' : item.type === 'quiz' || item.type === 'poll' || item.type === 'open' ? 'Pregunta' : 'Indicación', inp(d, 'q', 'Escribí aquí lo que verá el grupo', true)));
 
   if (item.type === 'quiz' || item.type === 'poll') {
     d.options ??= [];
@@ -83,6 +113,19 @@ export function editorForm(item, commit) {
     out.push(field('Palabras distractoras', inp(d, 'extra', 'átomo, energía'), 'Opcionales, separadas por coma.'));
   }
   if (item.type === 'order') out.push(field('Oración correcta', inp(d, 'sentence', 'El aprendizaje activo mejora la retención', true), 'Cada persona la recibe con las palabras revueltas.'));
+  if (item.type === 'frog') {
+    d.questions ??= [];
+    out.push(h('div.field', h('span.lbl', 'Preguntas del recorrido'),
+      d.questions.map((x, n) => h('div.q-block', h('div.q-head', h('b', `Salto ${n + 1}`), del(d.questions, n, 1)),
+        inp(x, 'q', 'Pregunta'),
+        [0, 1, 2].map((i) => h('div.opt-row',
+          h('button.mark.c3', { class: x.ok === i ? 'on' : '', type: 'button', title: x.ok === i ? 'Correcta' : 'Marcar como correcta', 'aria-pressed': String(x.ok === i), onclick: () => { x.ok = i; commit(true); } }, x.ok === i ? icon('check', 16) : h('span.dot')),
+          inp(x.options, i, `Opción ${i + 1}`))))),
+      d.questions.length < 10 && add('Agregar pregunta', () => d.questions.push({ q: '', options: ['', '', ''], ok: 0 })),
+      h('span.hint', 'La rana tiene tres vidas: cada error le quita una.')));
+  }
+  if (item.type === 'soup') out.push(field('Palabras escondidas', inp(d, 'words', 'rúbrica, evidencia, criterio', true), 'Hasta ocho palabras de 3 a 10 letras, separadas por coma. Las tildes se quitan en la cuadrícula.'));
+  if (item.type === 'letters') out.push(field('Palabra secreta', inp(d, 'word', 'RÚBRICA'), 'Cada persona recibe las letras revueltas.'));
   if (item.type !== 'slide') out.push(field('Tiempo para responder', sel(d, 'time', TIMES, true)));
   return h('div.form', out);
 }
@@ -95,6 +138,9 @@ export function solution(item) {
     case 'match': case 'pairs': return h('div.sol.sol-pairs', goodPairs(d).map((p) => h('div.sol-pair', h('span', p.a), h('i'), h('span', p.b))));
     case 'fill': return h('p.sol.sol-text', fillParts(d.text).map((p) => (p.blank ? h('b', p.blank) : p.t)));
     case 'order': return h('p.sol.sol-text', words(d.sentence).join(' '));
+    case 'frog': return h('div.sol.sol-pairs', goodFrog(d).map((x) => h('div.sol-pair', h('span', x.q), h('i'), h('span', x.options[x.ok]))));
+    case 'soup': return h('div.sol', soupWords(d).map((w) => h('span.sol-chip', w)));
+    case 'letters': return h('div.sol', h('span.sol-chip.word', letterList(d).join('')));
   }
   return null;
 }
@@ -143,6 +189,21 @@ export function stage(item, { phase = 'active', answers = [], preview = false } 
   if (item.type === 'pairs') {
     const ps = goodPairs(d);
     body.push(reveal ? solution(item) : h('div.deck', [...Array(ps.length * 2)].map((_, i) => h('span.back', { class: `c${i % 6}` }))));
+  }
+  if (item.type === 'frog') {
+    const qs = goodFrog(d);
+    body.push(reveal ? solution(item) : h('div.pond-show', h('div.pond-row', qs.map((_, i) => h('span.pad', String(i + 1)))), h('div.pond-start', frog()),
+      h('p', qs.length === 1 ? 'Un salto para cruzar' : `${qs.length} saltos para cruzar, tres vidas`)));
+  }
+  if (item.type === 'soup') {
+    const g = makeGrid(soupWords(d), item.id), hit = new Map();
+    if (reveal) g.placed.forEach((p, k) => p.idx.forEach((i) => hit.set(i, k)));
+    body.push(h('div.soup-show', h('div.soup', { style: { '--n': g.size } }, g.cells.map((c, i) => h('span', { class: hit.has(i) ? `f f${hit.get(i) % 6}` : '' }, c))),
+      h('div.soup-words', g.placed.map((p) => h('span.chip', p.w)))));
+  }
+  if (item.type === 'letters') {
+    const ls = letterList(d);
+    body.push(h('div.chips.big.tiles-l', (reveal ? ls.map((_, i) => i) : shuffled(ls.length, item.id)).map((i) => h('span.chip.big.letter', { class: reveal ? 'done' : '' }, ls[i]))));
   }
   if (reveal && TYPES[item.type].scored && item.type !== 'quiz') {
     const avg = n ? answers.reduce((s, a) => s + (a.frac || 0), 0) / n : 0, perfect = answers.filter((a) => a.frac >= 1).length;
@@ -206,10 +267,10 @@ export function player(item, ctx) {
     };
   }
 
-  if (item.type === 'fill' || item.type === 'order') {
-    const isFill = item.type === 'fill';
+  if (item.type === 'fill' || item.type === 'order' || item.type === 'letters') {
+    const isFill = item.type === 'fill', isL = item.type === 'letters';
     const parts = isFill ? fillParts(d.text) : [];
-    const target = isFill ? parts.filter((p) => p.blank).map((p) => p.blank) : words(d.sentence);
+    const target = isFill ? parts.filter((p) => p.blank).map((p) => p.blank) : isL ? letterList(d) : words(d.sentence);
     const pool = isFill ? bank(d, seed) : shuffled(target.length, seed).map((i) => target[i]);
     const slots = Array(target.length).fill(null); // índice del banco colocado en cada espacio
     const read = () => { const v = slots.map((s) => (s == null ? '' : pool[s])); return { value: v, frac: v.filter((w, i) => norm(w) === norm(target[i])).length / target.length }; };
@@ -218,11 +279,12 @@ export function player(item, ctx) {
     const draw = () => {
       const slotBtn = (k) => h('button.slot', { type: 'button', class: slots[k] != null ? 'full' : '', 'aria-label': slots[k] != null ? `Quitar ${pool[slots[k]]}` : 'Espacio vacío', onclick: () => { if (slots[k] == null) return; if (isFill) slots[k] = null; else { slots.splice(k, 1); slots.push(null); } draw(); } }, slots[k] != null ? pool[slots[k]] : '');
       if (isFill) { let k = 0; put(line, ...parts.map((p) => (p.blank ? slotBtn(k++) : p.t))); }
-      else { const used = slots.filter((s) => s != null).length; put(line, ...slots.slice(0, used).map((_, k) => slotBtn(k)), !used && h('span.ghost-line', 'Tocá las palabras en orden')); }
+      else { const used = slots.filter((s) => s != null).length; put(line, ...slots.slice(0, used).map((_, k) => slotBtn(k)), !used && h('span.ghost-line', isL ? 'Tocá las letras en orden' : 'Tocá las palabras en orden')); }
       put(chips, ...pool.map((w, i) => h('button.chip.pick', { type: 'button', disabled: slots.includes(i), onclick: () => { const k = slots.indexOf(null); if (k < 0) return; slots[k] = i; draw(); } }, w)));
       send.disabled = slots.includes(null);
     };
     draw();
+    if (isL) { line.classList.add('letters'); chips.classList.add('letters'); }
     return { el: h('div.p-act', line, chips, send), draft: () => (slots.some((s) => s != null) ? read() : null) };
   }
 
@@ -247,6 +309,70 @@ export function player(item, ctx) {
       return el;
     });
     return { el: h('div.p-act', info, h('div.cards', { class: `n${cards.length}` }, els)) };
+  }
+  if (item.type === 'frog') {
+    const qs = goodFrog(d), n = qs.length;
+    if (ctx.rec) return { el: h('div.p-act', h('div.pond.done', frog(), h('h3', `${ctx.rec.value?.ok ?? 0} de ${n} saltos correctos`), h('p', 'Ya completaste este recorrido.'))) };
+    let i = 0, ok = 0, lives = 3, lock = false;
+    const el = h('div.p-act');
+    const finish = () => { if (!ok) ctx.submit({ ok: 0, n }, 0); put(el, h('div.pond.done', frog(), h('h3', ok === n ? '¡La rana cruzó el estanque!' : `${ok} de ${n} saltos correctos`), h('p', lives ? 'Mirá la pantalla principal para ver los resultados.' : 'Se acabaron las vidas.'))); };
+    const draw = () => {
+      if (i >= n || lives <= 0) return finish();
+      const x = qs[i], opts = x.options.map((t, k) => ({ t, k })).filter((o) => o.t?.trim()), ord = shuffled(opts.length, seed + i);
+      const me = frog();
+      const pads = ord.map((oi) => { const o = opts[oi]; const pad = h('button.pad', { type: 'button', onclick: () => {
+        if (lock) return; lock = true;
+        if (o.k === x.ok) {
+          const a = me.getBoundingClientRect(), b = pad.getBoundingClientRect();
+          me.style.setProperty('--dx', `${b.left + b.width / 2 - a.left - a.width / 2}px`); me.style.setProperty('--dy', `${b.top + b.height / 2 - a.top - a.height / 2}px`);
+          me.classList.add('hop'); pad.classList.add('good'); ok++; ctx.submit({ ok, n }, ok / n);
+        } else { pad.classList.add('sink'); me.classList.add('oops'); lives--; }
+        setTimeout(() => { i++; lock = false; draw(); }, 750);
+      } }, h('span', o.t)); return pad; });
+      put(el, h('div.pond',
+        h('div.pond-top', h('span.pond-steps', qs.map((_, k) => h('i', { class: k < i ? 'on' : k === i ? 'now' : '' }))), h('span.pond-lives', { 'aria-label': `${lives} vidas` }, [0, 1, 2].map((k) => h('i', { class: k < lives ? 'on' : '' })))),
+        h('p.pond-q', x.q), h('div.pond-pads', pads), h('div.pond-home', me)));
+    };
+    draw();
+    return { el };
+  }
+
+  if (item.type === 'soup') {
+    const g = makeGrid(soupWords(d), item.id), n = g.placed.length, found = new Set(ctx.rec?.value?.found || []);
+    const cellEls = g.cells.map((c, i) => h('span', { 'data-i': String(i) }, c));
+    const grid = h('div.soup.play-soup', { style: { '--n': g.size } }, cellEls), list = h('div.chips'), info = h('p.p-hint');
+    const paint = () => {
+      cellEls.forEach((c) => { c.className = ''; });
+      g.placed.forEach((p, k) => { if (found.has(p.w)) p.idx.forEach((i) => cellEls[i].classList.add('f', `f${k % 6}`)); });
+      put(list, g.placed.map((p) => h('span.chip', { class: found.has(p.w) ? 'sent' : '' }, found.has(p.w) && icon('check', 14), p.w)));
+      info.textContent = found.size === n ? '¡Encontraste todas!' : 'Deslizá el dedo sobre cada palabra, o tocá su primera y su última letra.';
+    };
+    const line = (a, b) => {
+      const ax = a % g.size, ay = Math.floor(a / g.size), bx = b % g.size, by = Math.floor(b / g.size), dx = bx - ax, dy = by - ay;
+      if (dx && dy && Math.abs(dx) !== Math.abs(dy)) return null;
+      const len = Math.max(Math.abs(dx), Math.abs(dy));
+      return [...Array(len + 1)].map((_, k) => (ay + Math.sign(dy) * k) * g.size + ax + Math.sign(dx) * k);
+    };
+    const check = (cells) => {
+      const key = cells.join(), rev = [...cells].reverse().join();
+      const hit = g.placed.find((p) => !found.has(p.w) && (p.idx.join() === key || p.idx.join() === rev));
+      if (hit) { found.add(hit.w); ctx.submit({ found: [...found] }, found.size / n); }
+      paint();
+    };
+    const at = (e) => { const t = document.elementFromPoint(e.clientX, e.clientY)?.closest('[data-i]'); return t && grid.contains(t) ? +t.dataset.i : null; };
+    let start = null, tap = null, moved = false;
+    const mark = (cells) => { cellEls.forEach((c) => c.classList.remove('sel')); (cells || []).forEach((i) => cellEls[i].classList.add('sel')); };
+    grid.addEventListener('pointerdown', (e) => { const i = at(e); if (i == null) return; e.preventDefault(); start = i; moved = false; try { grid.setPointerCapture(e.pointerId); } catch { /* */ } if (tap == null) mark([i]); });
+    grid.addEventListener('pointermove', (e) => { if (start == null) return; const i = at(e); if (i == null || i === start) return; moved = true; tap = null; mark(line(start, i) || [start]); });
+    grid.addEventListener('pointerup', (e) => {
+      if (start == null) return; const end = at(e), s0 = start; start = null;
+      if (moved && end != null && end !== s0) { const c = line(s0, end); mark(); return c ? check(c) : paint(); }
+      if (tap != null && tap !== s0) { const c = line(tap, s0); tap = null; mark(); return c ? check(c) : paint(); }
+      tap = s0; mark([s0]);
+    });
+    grid.addEventListener('pointercancel', () => { start = null; mark(); });
+    paint();
+    return { el: h('div.p-act', info, grid, list) };
   }
   return { el: h('div') };
 }

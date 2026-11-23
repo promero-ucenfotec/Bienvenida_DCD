@@ -108,7 +108,7 @@ function demoStore() {
     },
 
     async listSessions() {
-      return clone(Object.values(db.sessions).filter((s) => !s.ended).sort((a, b) => b.created_at.localeCompare(a.created_at)));
+      return clone(Object.values(db.sessions).sort((a, b) => b.created_at.localeCompare(a.created_at)).slice(0, 30));
     },
     async createSession(pid, title, state) {
       let code = newCode(); while (db.sessions[code]) code = newCode();
@@ -125,7 +125,8 @@ function demoStore() {
     async setState(code, state) { const s = db.sessions[code]; if (s) mut(['sessions', code], { ...s, state: clone(state) }); },
     async endSession(code) { const s = db.sessions[code]; if (s) mut(['sessions', code], { ...s, ended: true }); },
 
-    async join(code, name) { mut(['players', code, myUid()], { uid: myUid(), name, joined_at: new Date().toISOString() }); },
+    async join(code, name, email) { const old = db.players[code]?.[myUid()]; mut(['players', code, myUid()], { seen: [], joined_at: new Date().toISOString(), ...old, uid: myUid(), name, email }); },
+    async markSeen(code, seen) { const old = db.players[code]?.[myUid()]; if (old) mut(['players', code, myUid()], { ...old, seen }); },
     async getPlayers(code) { return clone(Object.values(db.players[code] || {})); },
     async answer(code, itemId, rec) { mut(['answers', code, itemId, myUid()], { ...rec, item_id: itemId, uid: myUid() }); },
     async getAnswers(code, itemId) {
@@ -217,8 +218,8 @@ function supaStore() {
     },
 
     async listSessions() {
-      const since = new Date(Date.now() - 24 * 3600e3).toISOString();
-      return ok(await sb.from('sessions').select('*').eq('ended', false).gte('created_at', since).order('created_at', { ascending: false }));
+      const since = new Date(Date.now() - 60 * 24 * 3600e3).toISOString();
+      return ok(await sb.from('sessions').select('*').gte('created_at', since).order('created_at', { ascending: false }).limit(30));
     },
     async createSession(pid, title, state) {
       for (let i = 0; i < 6; i++) {
@@ -252,8 +253,9 @@ function supaStore() {
     },
     async endSession(code) { ok(await sb.from('sessions').update({ ended: true }).eq('code', code)); },
 
-    async join(code, name) { ok(await sb.from('players').upsert({ session_code: code, uid: myUid(), name })); },
-    async getPlayers(code) { return ok(await sb.from('players').select('uid,name,joined_at').eq('session_code', code).order('joined_at').limit(2000)); },
+    async join(code, name, email) { ok(await sb.from('players').upsert({ session_code: code, uid: myUid(), name, email })); },
+    async markSeen(code, seen) { ok(await sb.from('players').update({ seen }).eq('session_code', code).eq('uid', myUid())); },
+    async getPlayers(code) { return ok(await sb.from('players').select('uid,name,email,seen,joined_at').eq('session_code', code).order('joined_at').limit(2000)); },
     async answer(code, itemId, rec) {
       ok(await sb.from('answers').upsert({ session_code: code, item_id: itemId, uid: myUid(), name: rec.name, value: rec.value, frac: rec.frac, pts: rec.pts }));
     },
