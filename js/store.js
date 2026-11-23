@@ -253,8 +253,8 @@ function supaStore() {
     },
     async endSession(code) { ok(await sb.from('sessions').update({ ended: true }).eq('code', code)); },
 
-    async join(code, name, email) { ok(await sb.from('players').upsert({ session_code: code, uid: myUid(), name, email })); },
-    async markSeen(code, seen) { ok(await sb.from('players').update({ seen }).eq('session_code', code).eq('uid', myUid())); },
+    async join(code, name, email) { ok(await sb.rpc('join_session', { p_code: code, p_uid: myUid(), p_name: name, p_email: email })); },
+    async markSeen(code, seen) { ok(await sb.rpc('mark_seen', { p_code: code, p_uid: myUid(), p_seen: seen })); },
     async getPlayers(code) { return ok(await sb.from('players').select('uid,name,email,seen,joined_at').eq('session_code', code).order('joined_at').limit(2000)); },
     async answer(code, itemId, rec) {
       ok(await sb.from('answers').upsert({ session_code: code, item_id: itemId, uid: myUid(), name: rec.name, value: rec.value, frac: rec.frac, pts: rec.pts }));

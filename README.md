@@ -32,19 +32,22 @@ El dominio de correo aceptado se cambia en `js/config.js` (`EMAIL_DOMAIN`).
 
 ## Probarla sin configurar nada
 
-Mientras `js/config.js` esté vacío, Pulso corre en **modo demostración**: todo se guarda en el navegador y las salas funcionan entre pestañas del mismo equipo. La contraseña de administrador es `demo`.
+Con `js/config.js` vacío, Pulso corre en **modo demostración**: todo se guarda en el navegador y las salas funcionan entre pestañas del mismo equipo. La contraseña de administrador es `demo`.
 
 ```bash
 python3 -m http.server 8000   # y abrir http://localhost:8000
 ```
 
-## Conectar al grupo con Supabase
+## Conexión con Supabase
 
-1. Crear un proyecto en [supabase.com](https://supabase.com).
-2. Abrir **SQL Editor**, pegar el contenido de [`supabase/schema.sql`](supabase/schema.sql) y ejecutarlo. Crea las tablas, los permisos y el almacenamiento de diapositivas.
-3. En **Authentication → Users**, crear un usuario con correo y contraseña por cada administrador. Luego, en la configuración de inicio de sesión, desactivar el registro de usuarios nuevos para que nadie más pueda crearse una cuenta.
-4. En **Project Settings → API**, copiar la URL del proyecto y la clave `anon` en `js/config.js`.
-5. En GitHub, activar **Settings → Pages** con la rama `main` y la carpeta raíz.
+El proyecto de Supabase ya está creado y sus datos están en `js/config.js`. Para montarlo en otro proyecto:
+
+1. Ejecutar [`supabase/schema.sql`](supabase/schema.sql) en **SQL Editor**. Crea las tablas, los permisos y el almacenamiento de diapositivas.
+2. En **Authentication → Users**, crear un usuario con correo y contraseña por cada administrador, y desactivar el registro de usuarios nuevos en la configuración de inicio de sesión.
+3. Copiar la URL del proyecto y la clave publicable en `js/config.js`.
+4. En GitHub, activar **Settings → Pages** con la rama `main` y la carpeta raíz.
+
+Para volver al modo demostración basta con dejar vacíos los dos valores de `js/config.js`.
 
 ### Capacidad
 

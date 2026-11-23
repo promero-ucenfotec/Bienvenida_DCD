@@ -55,7 +55,8 @@ create table if not exists answers (
 create index if not exists answers_session_item_idx on answers(session_code, item_id);
 
 -- Seguridad: los administradores (usuarios con correo y contraseña) gestionan todo;
--- los participantes entran sin cuenta y solo pueden leer y registrar su nombre y sus respuestas.
+-- los participantes entran sin cuenta, leen el contenido y registran sus respuestas.
+-- La lista de participantes (con sus correos) solo la leen los administradores.
 alter table presentations enable row level security;
 alter table items enable row level security;
 alter table sessions enable row level security;
@@ -73,10 +74,30 @@ begin
   end loop;
 end $$;
 
+drop policy if exists "leer" on players;
 drop policy if exists "unirse" on players;
 drop policy if exists "renombrarse" on players;
-create policy "unirse" on players for insert to anon with check (true);
-create policy "renombrarse" on players for update to anon using (true) with check (true);
+
+-- Los participantes se registran por medio de funciones, sin acceso directo a la tabla.
+create or replace function public.join_session(p_code text, p_uid uuid, p_name text, p_email text)
+returns void language sql security definer set search_path = public as $$
+  insert into players (session_code, uid, name, email) values (p_code, p_uid, p_name, lower(p_email))
+  on conflict (session_code, uid) do update set name = excluded.name, email = excluded.email;
+$$;
+create or replace function public.mark_seen(p_code text, p_uid uuid, p_seen jsonb)
+returns void language sql security definer set search_path = public as $$
+  update players set seen = p_seen where session_code = p_code and uid = p_uid and jsonb_typeof(p_seen) = 'array';
+$$;
+revoke all on function public.join_session(text, uuid, text, text) from public;
+revoke all on function public.mark_seen(text, uuid, jsonb) from public;
+grant execute on function public.join_session(text, uuid, text, text) to anon, authenticated;
+grant execute on function public.mark_seen(text, uuid, jsonb) to anon, authenticated;
+
+grant usage on schema public to anon, authenticated;
+grant all on presentations, items, sessions, players, answers to authenticated;
+grant select on presentations, items, sessions, answers to anon;
+grant insert, update on answers to anon;
+revoke all on players from anon;
 
 drop policy if exists "responder" on answers;
 drop policy if exists "corregir" on answers;
